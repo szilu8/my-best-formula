@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>My Best Formula</title>
+<style>
+:root{
+  --bg:#141518;
+  --panel:#1c1e22;
+  --line:#2c3036;
+  --fg:#e4f1ff;
+  --dim:#8fa3b8;
+  --accent:#a9d8ff;
+  --grey:#8b9097;
+  --orange:#ff9a2e;
+  --lemon:#fff44f;
+  --bad:#ff7070;
+  --good:#8dffad;
+  --me:#22374a;
+}
+html,body{background:var(--bg);color:var(--fg);margin:0;}
+body{font-family:"Courier New",ui-monospace,Menlo,Consolas,monospace;font-size:14px;line-height:1.45;}
+#term{max-width:1000px;margin:0 auto;padding:16px;}
+pre{margin:0;white-space:pre;overflow-x:auto;font:inherit;}
+.block{margin:0 0 14px 0;}
+.btn{background:none;border:none;color:var(--accent);font:inherit;cursor:pointer;padding:0;margin:0;}
+.btn:hover{color:#fff;text-decoration:underline;}
+.btn:disabled{color:#4a4f57;cursor:default;text-decoration:none;}
+.btn.on{color:var(--bg);background:var(--accent);}
+.dim{color:var(--dim);}
+.hl{color:#fff;font-weight:bold;}
+.bad{color:var(--bad);}
+.good{color:var(--good);}
+.r-grey{color:var(--grey);}
+.r-orange{color:var(--orange);}
+.r-lemon{color:var(--lemon);}
+.me{background:var(--me);}
+.cursor{display:inline-block;width:.6em;background:var(--fg);animation:blink 1s steps(1) infinite;}
+@keyframes blink{50%{background:transparent;}}
+@media (max-width:600px){body{font-size:11px;}#term{padding:10px;}}
+</style>
+</head>
+<body>
+<div id="term"></div>
+<script>
+/* =====================================================================
+   MY BEST FORMULA - a text-only Formula 1 management game (2026 season)
+   ===================================================================== */
+const Engine = (function () {
+  const R = () => Math.random();
+  function gauss() { let u = 0, v = 0; while (!u) u = R(); while (!v) v = R(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+  const randint = (a, b) => a + Math.floor(R() * (b - a + 1));
+  const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+
+  // ---- 2026 teams, rough real-world pecking order (car only: power / aero / mechanical) ----
+  const TEAMS = [
+    { id: 'mer', name: 'Mercedes',     car: { p: 94, a: 91, m: 91 }, wear: 0.97 },
+    { id: 'fer', name: 'Ferrari',      car: { p: 90, a: 90, m: 90 }, wear: 0.98 },
+    { id: 'mcl', name: 'McLaren',      car: { p: 89, a: 90, m: 89 }, wear: 0.95 },
+    { id: 'rbr', name: 'Red Bull',     car: { p: 87, a: 88, m: 87 }, wear: 1.00 },
+    { id: 'haa', name: 'Haas',         car: { p: 85, a: 83, m: 83 }, wear: 1.02 },
+    { id: 'alp', name: 'Alpine',       car: { p: 86, a: 82, m: 82 }, wear: 1.02 },
+    { id: 'rb',  name: 'Racing Bulls', car: { p: 84, a: 82, m: 82 }, wear: 1.00 },
+    { id: 'aud', name: 'Audi',         car: { p: 82, a: 81, m: 82 }, wear: 1.01 },
+    { id: 'wil', name: 'Williams',     car: { p: 85, a: 79, m: 80 }, wear: 1.03 },
+    { id: 'ast', name: 'Aston Martin', car: { p: 76, a: 82, m: 80 }, wear: 1.02 },
+    { id: 'cad', name: 'Cadillac',     car: { p: 80, a: 76, m: 76 }, wear: 1.04 },
+  ];
+  const TEAM = {}; TEAMS.forEach(t => TEAM[t.id] = t);
+
+  // ---- 2026 drivers. Rating = driver-only performance this season (60..120, exclusive) ----
+  const DRIVERS = [
+    { name: 'Max Verstappen',     team: 'rbr', rating: 117 },
+    { name: 'George Russell',     team: 'mer', rating: 114 },
+    { name: 'Charles Leclerc',    team: 'fer', rating: 113 },
+    { name: 'Kimi Antonelli',     team: 'mer', rating: 112 },
+    { name: 'Lando Norris',       team: 'mcl', rating: 111 },
+    { name: 'Oscar Piastri',      team: 'mcl', rating: 109 },
+    { name: 'Lewis Hamilton',     team: 'fer', rating: 106 },
+    { name: 'Fernando Alonso',    team: 'ast', rating: 103 },
+    { name: 'Isack Hadjar',       team: 'rbr', rating: 102 },
+    { name: 'Carlos Sainz',       team: 'wil', rating: 100 },
+    { name: 'Oliver Bearman',     team: 'haa', rating: 99 },
+    { name: 'Pierre Gasly',       team: 'alp', rating: 98 },
+    { name: 'Alexander Albon',    team: 'wil', rating: 96 },
+    { name: 'Nico Hulkenberg',    team: 'aud', rating: 94 },
+    { name: 'Gabriel Bortoleto',  team: 'aud', rating: 93 },
+    { name: 'Esteban Ocon',       team: 'haa', rating: 92 },
+    { name: 'Liam Lawson',        team: 'rb',  rating: 91 },
+    { name: 'Arvid Lindblad',     team: 'rb',  rating: 89 },
+    { name: 'Sergio Perez',       team: 'cad', rating: 87 },
+    { name: 'Valtteri Bottas',    team: 'cad', rating: 86 },
+    { name: 'Franco Colapinto',   team: 'alp', rating: 84 },
+    { name: 'Lance Stroll',       team: 'ast', rating: 79 },
+  ];
+  const RESERVE_RATING = 76;
+  const TOP_TEAMS = ['Mercedes', 'Ferrari', 'McLaren', 'Red Bull'];
+  const PLAYER_TEAM = 'My Best Formula';
+
+  // ---- Tracks (laps = half of the real race distance) ----
+  const TRACKS = [
+    { name: 'Australian Grand Prix', short: 'AUSTRALIA', circuit: 'Albert Park, Melbourne', realLaps: 58, base: 80.5, pit: 19.5,
+      w: { p: .40, a: .35, m: .25 }, abr: 1.00, ovt: 0.50, sc: 0.45, rain: 0.25, inc: 1.2 },
+    { name: 'Canadian Grand Prix', short: 'CANADA', circuit: 'Circuit Gilles Villeneuve, Montreal', realLaps: 70, base: 74.0, pit: 18.5,
+      w: { p: .50, a: .20, m: .30 }, abr: 0.85, ovt: 0.65, sc: 0.50, rain: 0.35, inc: 1.4 },
+    { name: 'Monaco Grand Prix', short: 'MONACO', circuit: 'Circuit de Monaco, Monte Carlo', realLaps: 78, base: 73.5, pit: 19.0,
+      w: { p: .10, a: .35, m: .55 }, abr: 0.55, ovt: 0.05, sc: 0.50, rain: 0.25, inc: 1.6 },
+    { name: 'British Grand Prix', short: 'GREAT BRITAIN', circuit: 'Silverstone Circuit', realLaps: 52, base: 88.5, pit: 20.0,
+      w: { p: .35, a: .50, m: .15 }, abr: 1.30, ovt: 0.55, sc: 0.30, rain: 0.50, inc: 1.0 },
+    { name: 'Hungarian Grand Prix', short: 'HUNGARY', circuit: 'Hungaroring, Budapest', realLaps: 70, base: 79.5, pit: 20.5,
+      w: { p: .15, a: .45, m: .40 }, abr: 1.05, ovt: 0.22, sc: 0.25, rain: 0.25, inc: 0.9 },
+    { name: 'Sao Paulo Grand Prix', short: 'BRAZIL', circuit: 'Interlagos, Sao Paulo', realLaps: 71, base: 72.0, pit: 21.0,
+      w: { p: .40, a: .30, m: .30 }, abr: 1.00, ovt: 0.60, sc: 0.50, rain: 0.55, inc: 1.3 },
+  ];
+  TRACKS.forEach(t => t.laps = Math.ceil(t.realLaps / 2));
+
+  // ---- Tyres ----
+  const TYRES = {
+    S: { name: 'SOFT',         short: 'S', life: 11, deg: 1.30, off: 0.00 },
+    M: { name: 'MEDIUM',       short: 'M', life: 18, deg: 1.00, off: 0.45 },
+    H: { name: 'HARD',         short: 'H', life: 28, deg: 0.90, off: 0.85 },
+    I: { name: 'INTERMEDIATE', short: 'I', life: 22, deg: 1.00, off: 0.00 },
+    W: { name: 'WET',          short: 'W', life: 30, deg: 0.80, off: 0.00 },
+  };
+  const isSlick = t => t === 'S' || t === 'M' || t === 'H';
+
+  // ---- Car components ----
+  const COMPONENTS = {
+    e: { name: 'ENGINE', stat: 'POWER',
+      desc: 'Power unit. Straight-line speed (Canada, Brazil, Australia) and overtaking on the straights.',
+      tiers: [10000, 20000, 31000, 43000, 56000], upBase: 15000 },
+    b: { name: 'BODYWORK', stat: 'AERO',
+      desc: 'Wings and floor. Downforce in fast corners (Silverstone, Hungary) and following in dirty air.',
+      tiers: [9000, 18000, 28000, 39000, 51000], upBase: 13500 },
+    s: { name: 'SUSPENSION', stat: 'MECH',
+      desc: 'Mechanical grip in slow corners (Monaco, Hungary), lower tyre wear, more grip in the wet.',
+      tiers: [8000, 16000, 25000, 35000, 46000], upBase: 12000 },
+  };
+  const MAX_LEVEL = 10;
+  const START_BUDGET = 100000;
+  const levelStat = L => 66 + 3.5 * L;
+  function upgradeCost(k, L) { return Math.round((COMPONENTS[k].upBase + (L - 1) * 3000) / 500) * 500; }
+
+  const POINTS = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1];
+  function prize(pos) { return pos ? Math.max(35000, 95000 - (pos - 1) * 3000) : 30000; }
+  const AI_DEV_PER_ROUND = 0.3;
+
+  // ================= SEASON =================
+  function newSeason(driverName) {
+    const drafted = DRIVERS.find(d => d.name === driverName);
+    const entries = [];
+    DRIVERS.forEach(d => {
+      if (d.name === driverName) {
+        entries.push({ id: 'R-' + d.team, name: 'Reserve Driver', rating: RESERVE_RATING, team: d.team, teamName: TEAM[d.team].name, isPlayer: false });
+      } else {
+        entries.push({ id: d.name, name: d.name, rating: d.rating, team: d.team, teamName: TEAM[d.team].name, isPlayer: false });
+      }
+    });
+    entries.push({ id: 'PLAYER', name: drafted.name, rating: drafted.rating, team: 'player', teamName: PLAYER_TEAM, isPlayer: true, from: TEAM[drafted.team].name });
+    const pts = {}; entries.forEach(e => pts[e.id] = 0);
+    return { entries, pts, money: START_BUDGET, levels: { e: 1, b: 1, s: 1 }, round: 0, history: [], built: false };
+  }
+
+  function playerCar(season) {
+    const L = season.levels;
+    return { p: levelStat(L.e), a: levelStat(L.b), m: levelStat(L.s) };
+  }
+  function aiCar(teamId, round) {
+    const c = TEAM[teamId].car, d = round * AI_DEV_PER_ROUND;
+    return { p: c.p + d, a: c.a + d, m: c.m + d };
+  }
+  const carRating = (car, T) => car.p * T.w.p + car.a * T.w.a + car.m * T.w.m;
+  function overall(car) { return (car.p + car.a + car.m) / 3; }
+
+  // ================= WEATHER =================
+  function genWeather(T) {
+    const n = T.laps;
+    const rain = new Array(n + 2).fill(0);
+    if (R() < T.rain) {
+      const events = R() < 0.3 ? 2 : 1;
+      for (let e = 0; e < events; e++) {
+        const start = R() < 0.18 ? 0 : randint(3, Math.max(4, n - 6));
+        const dur = randint(4, 13);
+        const heavy = R() < 0.35;
+        for (let l = start; l <= Math.min(n + 1, start + dur); l++) {
+          const edge = heavy && dur > 6 && (l - start < 2 || start + dur - l < 2);
+          rain[l] = Math.max(rain[l], heavy && !edge ? 2 : 1);
+        }
+      }
+    }
+    // forecast in blocks of 3 laps, each block correct with ~75% probability
+    const blocks = [];
+    for (let b = 0; b * 3 + 1 <= n; b++) {
+      const from = b * 3 + 1, to = Math.min(n, b * 3 + 3);
+      let truth = 0; for (let l = from; l <= to; l++) truth = Math.max(truth, rain[l]);
+      let fc = truth;
+      if (R() >= 0.75) {
+        if (truth === 0) fc = 1;
+        else if (truth === 1) fc = R() < 0.6 ? 0 : 2;
+        else fc = 1;
+      }
+      blocks.push({ from, to, truth, fc });
+    }
+    const wet0 = rain[0] === 2 ? 0.8 : rain[0] === 1 ? 0.45 : 0;
+    return { rain, blocks, wet0 };
+  }
+  function stepWetness(w, r) {
+    if (r === 0) return Math.max(0, w - 0.075);
+    if (r === 1) return clamp(w + (0.55 - w) * 0.3, 0, 1);
+    return clamp(w + (0.95 - w) * 0.35, 0, 1);
+  }
+  const RAIN_NAME = ['DRY', 'LIGHT RAIN', 'HEAVY RAIN'];
+  function trackState(w) {
+    if (w < 0.08) return 'DRY';
+    if (w < 0.2) return 'DRYING / DAMP';
+    if (w < 0.45) return 'DAMP';
+    if (w < 0.66) return 'WET';
+    return 'VERY WET';
+  }
+
+  // ================= TYRE MODEL =================
+  function tyrePenalty(t, w) {
+    if (isSlick(t)) return w <= 0.12 ? 0 : (w - 0.12) * 22 + (w > 0.5 ? (w - 0.5) * 20 : 0);
+    if (t === 'I') return (w < 0.35 ? (0.35 - w) * 12 : 0) + (w > 0.62 ? (w - 0.62) * 16 : 0);
+    return 0.6 + Math.max(0, 0.72 - w) * 9; // W
+  }
+  function tyreLoss(c) {
+    const T = TYRES[c.tyre];
+    const x = c.wear;
+    let loss = T.deg * Math.pow(Math.min(x, 1), 1.4);
+    if (x > 1) loss += (x - 1) * 9;
+    return loss;
+  }
+  function wearRate(c, race, tyre) {
+    const t = tyre || c.tyre, T = race.track, w = race.wet;
+    let r = 1 / TYRES[t].life * c.wearMult;
+    if (isSlick(t)) r *= T.abr * (w > 0.15 ? 0.7 : 1);
+    else if (t === 'I') r *= Math.sqrt(T.abr) * (w < 0.25 ? 1 + (0.25 - w) * 10 : 1);
+    else r *= Math.sqrt(T.abr) * (w < 0.5 ? 1 + (0.5 - w) * 8 : 1);
+    return r;
+  }
+  const MODES = {
+    PUSH:     { name: 'PUSH',     dt: -0.30, wear: 1.40 },
+    NORMAL:   { name: 'NORMAL',   dt: 0,     wear: 1.00 },
+    CONSERVE: { name: 'CONSERVE', dt: 0.35,  wear: 0.70 },
+  };
+
+  // ================= RACE =================
+  function makeCar(entry, season) {
+    const car = entry.isPlayer ? playerCar(season) : aiCar(entry.team, season.round);
+    const wearMult = entry.isPlayer ? (1.12 - 0.025 * season.levels.s) : TEAM[entry.team].wear;
+    return {
+      id: entry.id, name: entry.name, rating: entry.rating, teamName: entry.teamName, isPlayer: entry.isPlayer,
+      car, wearMult, tyre: 'M', wear: 0, age: 0, stops: 0, usedDry: new Set(), usedWet: false,
+      total: 0, last: 0, best: Infinity, status: 'run', dnfLap: 0, dnfReason: '', pitAt: 1, react: 1, mis: 0,
+      mode: 'NORMAL', pitTo: null, grid: 0, penalty: 0,
+    };
+  }
+
+  function prepareRace(season) {
+    const T = TRACKS[season.round];
+    const wx = genWeather(T);
+    const race = {
+      track: T, round: season.round, laps: T.laps, lap: 0, wet: wx.wet0, rain: wx.rain, blocks: wx.blocks,
+      cars: season.entries.map(e => makeCar(e, season)), sc: 0, scUsed: 0, log: [], finished: false,
+      boxReq: null, fastest: null, started: false,
+    };
+    // qualifying
+    const w = race.wet;
+    race.cars.forEach(c => {
+      c.q = T.base + (100 - carRating(c.car, T)) * 0.06 + (120 - c.rating) * 0.017 * (1 + w * 0.8)
+        - (c.car.m - 80) * 0.02 * w + w * 7 + gauss() * (0.12 + w * 0.25) - 0.6;
+    });
+    race.grid = race.cars.slice().sort((a, b) => a.q - b.q);
+    race.grid.forEach((c, i) => { c.grid = i + 1; c.total = i * 0.3; });
+    return race;
+  }
+
+  function bestClass(w) { return w < 0.2 ? 'D' : w < 0.66 ? 'I' : 'W'; }
+
+  function chooseDry(c, race, rem) {
+    let opts = ['S', 'M', 'H'];
+    if (!c.usedWet && c.usedDry.size === 1) opts = opts.filter(k => !c.usedDry.has(k));
+    for (const k of opts) if (rem * wearRate(c, race, k) <= 1.0) return k;
+    return opts[opts.length - 1];
+  }
+
+  function aiStartTyre(c, race) {
+    const cls = bestClass(race.wet);
+    if (cls !== 'D') return cls;
+    const r = R();
+    if (race.track.abr < 0.7) return r < 0.6 ? 'M' : (r < 0.8 ? 'H' : 'S');
+    if (c.grid <= 10) return r < 0.7 ? 'M' : 'S';
+    return r < 0.4 ? 'H' : r < 0.75 ? 'M' : 'S';
+  }
+
+  function needsSecond(c) { return !c.usedWet && c.usedDry.size < 2; }
+
+  function aiDecide(c, race) {
+    const rem = race.laps - race.lap;
+    if (rem <= 0) return null;
+    const w = race.wet;
+    const target = bestClass(w);
+    const cur = isSlick(c.tyre) ? 'D' : c.tyre;
+    if (target !== cur) {
+      const tgt = target === 'D' ? 'M' : target;
+      const gain = tyrePenalty(c.tyre, w) - tyrePenalty(tgt, w) - (isSlick(tgt) ? TYRES[tgt].off : 0);
+      if (gain > 0.8 && rem >= 2) {
+        c.mis++;
+        if (c.mis > c.react) { c.mis = 0; return target === 'D' ? chooseDry(c, race, rem) : target; }
+      } else c.mis = 0;
+      return null;
+    }
+    c.mis = 0;
+    if (cur !== 'D') return (c.wear > 1.1 && rem > 3) ? c.tyre : null;
+    const endWear = c.wear + rem * wearRate(c, race);
+    const need2 = needsSecond(c);
+    if (race.sc > 0 && rem > 4 && (c.wear > 0.4 || need2) && endWear > 0.9) return chooseDry(c, race, rem);
+    if (need2 && rem <= 2) return chooseDry(c, race, rem);
+    if (c.wear > 1.3 && rem > 1) return chooseDry(c, race, rem);
+    if (c.wear >= c.pitAt && rem > 2) {
+      if (!need2 && endWear < 1.15) return null;
+      return chooseDry(c, race, rem);
+    }
+    return null;
+  }
+
+  function startRace(race, playerTyre) {
+    race.cars.forEach(c => {
+      c.tyre = c.isPlayer ? playerTyre : aiStartTyre(c, race);
+      if (isSlick(c.tyre)) c.usedDry.add(c.tyre); else c.usedWet = true;
+      c.pitAt = 0.85 + R() * 0.25;
+      c.react = c.isPlayer ? 0 : (TOP_TEAMS.indexOf(c.teamName) >= 0 ? 1 : (R() < 0.5 ? 1 : 2));
+    });
+    race.started = true;
+    addLog(race, 'Lights out and away we go! ' + race.track.name + ', ' + race.laps + ' laps.');
+  }
+
+  function addLog(race, msg, lap) { race.log.push({ lap: lap === undefined ? race.lap : lap, msg }); }
+
+  function lapTime(c, race) {
+    const T = race.track, w = race.wet;
+    let t = T.base + (100 - carRating(c.car, T)) * 0.06;
+    t += (120 - c.rating) * 0.017 * (1 + w * 0.8);
+    t -= (c.car.m - 80) * 0.02 * w;
+    t += (isSlick(c.tyre) ? TYRES[c.tyre].off : 0) + tyreLoss(c) + tyrePenalty(c.tyre, w) + w * 7;
+    t += MODES[c.mode].dt;
+    t -= race.lap * 0.035;
+    t += gauss() * (0.14 + (120 - c.rating) * 0.004);
+    if (race.lap === 1) t += 3 + gauss() * 0.5;
+    return t;
+  }
+
+  function running(race) { return race.cars.filter(c => c.status === 'run').sort((a, b) => a.total - b.total); }
+
+  function retire(race, c, reason) {
+    c.status = 'dnf'; c.dnfLap = race.lap; c.dnfReason = reason;
+    addLog(race, c.name + ' (' + c.teamName + ') is OUT: ' + reason + '.');
+  }
+
+  function simLap(race) {
+    if (race.finished) return;
+    const T = race.track;
+    race.lap++;
+    const lap = race.lap;
+    const scLap = race.sc > 0;
+    // weather for this lap
+    const prevWet = race.wet;
+    const prevRain = race.rain[lap - 1] || 0;
+    const r = race.rain[lap] || 0;
+    race.wet = stepWetness(race.wet, r);
+    if (r !== prevRain) addLog(race, r === 0 ? 'The rain has stopped.' : r === 1 ? (prevRain === 2 ? 'Rain easing to a light drizzle.' : 'Rain is starting to fall!') : 'HEAVY RAIN now!');
+    if (prevWet >= 0.2 && race.wet < 0.2) addLog(race, 'A dry line is appearing - slick tyre conditions.');
+
+    const run = running(race);
+    // pit decisions
+    run.forEach(c => {
+      if (c.isPlayer) { c.pitTo = race.boxReq; race.boxReq = null; }
+      else c.pitTo = aiDecide(c, race);
+      if (c.isPlayer && c.pitTo && lap >= race.laps) { c.pitTo = null; }
+    });
+    // raw lap
+    run.forEach(c => {
+      let lt = scLap ? T.base * 1.4 + gauss() * 0.3 : lapTime(c, race);
+      if (c.pitTo) {
+        let stat = 2.0 + Math.abs(gauss()) * 0.4;
+        if (R() < 0.04) { stat += 2 + R() * 5; addLog(race, 'Slow pit stop for ' + c.name + ' (' + stat.toFixed(1) + 's).'); }
+        lt += (scLap ? T.pit * 0.5 : T.pit) + stat;
+        c.lastStop = stat;
+      }
+      c.raw = c.total + lt;
+    });
+    // track order / overtakes
+    let res = [];
+    if (scLap) {
+      res = run.slice().sort((a, b) => a.raw - b.raw);
+      const orig = res.map(c => c.raw);
+      for (let k = 1; k < res.length; k++) {
+        const gap = orig[k] - orig[k - 1];
+        res[k].raw = res[k - 1].raw + Math.max(0.6, gap * 0.35);
+      }
+    } else {
+      for (const c of run) {
+        let i = res.length, passes = 0;
+        while (i > 0) {
+          const a = res[i - 1];
+          if (c.raw >= a.raw) {
+            if (!c.pitTo && !a.pitTo && c.raw < a.raw + 0.25) c.raw = a.raw + 0.25;
+            break;
+          }
+          let ok;
+          if (a.pitTo || c.pitTo) ok = true;
+          else {
+            const d = a.raw - c.raw;
+            let pc = T.ovt * (0.3 + d * 1.1) + (c.car.p - a.car.p) * 0.01 + (c.car.a - 80) * 0.004;
+            if (lap === 1) pc += 0.25;
+            if (a.status !== 'run') pc = 1;
+            pc = clamp(pc, 0.02, 0.97);
+            if (passes >= 2) pc = 0;
+            ok = R() < pc;
+            if (ok && (c.isPlayer || a.isPlayer) && lap > 1)
+              addLog(race, c.isPlayer ? 'You overtake ' + a.name + '!' : a.isPlayer ? c.name + ' overtakes you.' : '');
+          }
+          if (ok) { i--; passes++; continue; }
+          const next = i < res.length ? res[i].raw : Infinity;
+          const g = Math.min(0.2 + R() * 0.3, (next - a.raw) / 2);
+          c.raw = a.raw + g;
+          if (c.isPlayer && R() < 0.25) addLog(race, 'You are stuck behind ' + a.name + '.');
+          break;
+        }
+        res.splice(i, 0, c);
+      }
+    }
+    // commit
+    res.forEach(c => {
+      c.last = c.raw - c.total;
+      c.total = c.raw;
+      if (!scLap && !c.pitTo && lap > 1 && c.last < c.best) c.best = c.last;
+      if (!scLap && !c.pitTo && lap > 1 && (!race.fastest || c.last < race.fastest.time)) race.fastest = { name: c.name, time: c.last, lap };
+      c.wear += wearRate(c, race) * (scLap ? 0.4 : MODES[c.mode].wear);
+      c.age++;
+      if (c.pitTo) {
+        const from = c.tyre;
+        c.tyre = c.pitTo; c.wear = 0; c.age = 0; c.stops++;
+        if (isSlick(c.tyre)) c.usedDry.add(c.tyre); else c.usedWet = true;
+        c.pitAt = 0.85 + R() * 0.25;
+        if (c.isPlayer || res.indexOf(c) < 6) addLog(race, (c.isPlayer ? 'YOU pit' : c.name + ' pits') + ': ' + TYRES[from].name + ' -> ' + TYRES[c.tyre].name + (scLap ? ' (cheap stop under Safety Car)' : '') + '.');
+      }
+    });
+    // incidents
+    let incident = false;
+    if (lap < race.laps) {
+      res.forEach(c => {
+        if (c.status !== 'run') return;
+        if (R() < 0.025 / race.laps) { retire(race, c, ['engine failure', 'hydraulics', 'gearbox problem', 'electrical issue'][randint(0, 3)]); if (R() < 0.3) incident = true; return; }
+        let p = 0.0006 * T.inc * (1 + race.wet * 3);
+        if (isSlick(c.tyre) && race.wet > 0.35) p += 0.02;
+        if (c.tyre === 'I' && race.wet > 0.8) p += 0.01;
+        if (c.wear > 1.3) p += 0.01;
+        if (c.mode === 'PUSH') p *= 1.5;
+        if (lap === 1) p *= 4;
+        if (scLap) p *= 0.2;
+        if (R() < p) { retire(race, c, 'crashed'); if (R() < 0.7) incident = true; }
+      });
+    }
+    // safety car
+    if (race.sc > 0) {
+      race.sc--;
+      if (race.sc === 0) addLog(race, 'Safety Car in this lap - racing resumes!');
+    } else if (lap < race.laps - 2 && (incident || R() < T.sc * 0.5 / race.laps)) {
+      race.sc = 3; race.scUsed++;
+      addLog(race, 'SAFETY CAR DEPLOYED' + (incident ? '' : ' (debris on track)') + ' - pit stops are cheaper now!');
+    }
+    if (lap >= race.laps) finishRace(race);
+  }
+
+  function finishRace(race) {
+    race.finished = true;
+    race.cars.forEach(c => {
+      if (c.status === 'run' && !c.usedWet && c.usedDry.size < 2) {
+        c.penalty = 30; c.total += 30;
+        addLog(race, c.name + ': 30s penalty - did not use two different dry compounds.');
+      }
+    });
+    const fin = race.cars.filter(c => c.status === 'run').sort((a, b) => a.total - b.total);
+    const out = race.cars.filter(c => c.status !== 'run').sort((a, b) => b.dnfLap - a.dnfLap);
+    race.result = fin.concat(out);
+    race.result.forEach((c, i) => { c.pos = c.status === 'run' ? i + 1 : 0; c.place = i + 1; });
+    addLog(race, 'CHEQUERED FLAG! ' + fin[0].name + ' wins the ' + race.track.name + '.');
+  }
+
+  function applyResults(season, race) {
+    const rows = race.result.map(c => {
+      const pts = c.pos && c.pos <= 10 ? POINTS[c.pos - 1] : 0;
+      season.pts[c.id] += pts;
+      return { id: c.id, pos: c.pos, place: c.place, pts };
+    });
+    const me = race.cars.find(c => c.isPlayer);
+    const money = prize(me.pos);
+    season.money += money;
+    season.history.push({ track: race.track.short, pos: me.pos, grid: me.grid, money, pts: rows.find(r => r.id === 'PLAYER').pts });
+    season.round++;
+    return { money };
+  }
+
+  function standings(season) {
+    const best = {};
+    season.entries.forEach(e => best[e.id] = e);
+    return season.entries.slice().sort((a, b) => season.pts[b.id] - season.pts[a.id] || b.rating - a.rating)
+      .map((e, i) => ({ pos: i + 1, e, pts: season.pts[e.id] }));
+  }
+
+  // estimate where the player rejoins if they pit this lap
+  function projectPit(race) {
+    const run = running(race);
+    const me = run.find(c => c.isPlayer);
+    if (!me) return null;
+    const loss = (race.sc > 0 ? race.track.pit * 0.5 : race.track.pit) + 2.3;
+    const t = me.total + loss;
+    let pos = 1;
+    run.forEach(c => { if (c !== me && c.total < t) pos++; });
+    return { loss, pos };
+  }
+
+  return { TEAMS, TEAM, DRIVERS, TRACKS, TYRES, COMPONENTS, MODES, MAX_LEVEL, START_BUDGET, POINTS, RAIN_NAME,
+    levelStat, upgradeCost, prize, newSeason, playerCar, aiCar, carRating, overall, prepareRace, startRace, simLap,
+    applyResults, standings, running, projectPit, trackState, isSlick, tyrePenalty, aiDecide, chooseDry, bestClass };
+})();
+
+/* =====================================================================
+   USER INTERFACE
+   ===================================================================== */
+if (typeof document !== 'undefined') (function () {
+  const E = Engine;
+  const term = document.getElementById('term');
+  const LAP_MS = 7000;
+  let G = null;           // game state
+  let timer = null;
+
+  const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const pad = (s, n) => { s = String(s); return s.length >= n ? s.slice(0, n) : s + ' '.repeat(n - s.length); };
+  const lpad = (s, n) => { s = String(s); return s.length >= n ? s : ' '.repeat(n - s.length) + s; };
+  const rcls = r => r >= 110 ? 'r-lemon' : r >= 90 ? 'r-orange' : 'r-grey';
+  const rtxt = (txt, r) => '<span class="' + rcls(r) + '">' + esc(txt) + '</span>';
+  const money = n => '$' + Math.round(n).toLocaleString('en-US');
+  const btn = (label, act, arg, opts) => {
+    opts = opts || {};
+    return '<button class="btn' + (opts.on ? ' on' : '') + '" data-act="' + act + '"' + (arg !== undefined ? ' data-arg="' + esc(arg) + '"' : '') + (opts.disabled ? ' disabled' : '') + '>[ ' + esc(label) + ' ]</button>';
+  };
+  const bar = (frac, n) => { const k = Math.round(Math.max(0, Math.min(1, frac)) * n); return '[' + '#'.repeat(k) + '.'.repeat(n - k) + ']'; };
+  const fmtLap = t => { if (!isFinite(t) || t <= 0) return '--:--.---'; const m = Math.floor(t / 60); const s = t - m * 60; return m + ':' + (s < 10 ? '0' : '') + s.toFixed(3); };
+  const block = html => '<pre class="block">' + html + '</pre>';
+  const HR = '<span class="dim">' + '-'.repeat(78) + '</span>';
+  const header = sub => block('<span class="hl">MY BEST FORMULA</span>  <span class="dim">:: 2026 :: ' + esc(sub) + '</span>\n' + HR);
+  function show(html) { term.innerHTML = html; window.scrollTo(0, 0); }
+
+  const ACT = {};
+  term.addEventListener('click', ev => {
+    const b = ev.target.closest('[data-act]');
+    if (!b || b.disabled) return;
+    const f = ACT[b.dataset.act];
+    if (f) f(b.dataset.arg);
+  });
+
+  // ---------------- TITLE ----------------
+  function titleScreen() {
+    stopTimer();
+    const logo = [
+      ' __  __  __   __    ____  ____  ____  ____',
+      '|  \\/  | \\ \\ / /   | __ )| ___|/ ___||_  _|',
+      '| |\\/| |  \\ V /    |  _ \\|  _| \\___ \\  ||',
+      '|_|  |_|   |_|     |____/|____||____/  ||',
+      '        F  O  R  M  U  L  A     -  2 0 2 6',
+    ].join('\n');
+    show(block('<span class="hl">' + esc(logo) + '</span>') +
+      block('A text-only Formula 1 management game.\n\n' +
+        '1. Draw a 2026 F1 driver (up to 3 re-rolls).\n' +
+        '2. Build your car from a ' + money(E.START_BUDGET) + ' budget: engine, bodywork, suspension.\n' +
+        '3. Race 6 Grands Prix against the 2026 grid: manage tyres, pit stops, pace and weather.\n' +
+        '4. Earn prize money after every race and upgrade your car.\n' +
+        '5. Finish on the podium of the Drivers\' Championship. It will not be easy.\n\n' +
+        '<span class="dim">Calendar: Australia - Canada - Monaco - Great Britain - Hungary - Brazil</span>') +
+      block(btn('START NEW GAME', 'newgame') + ' <span class="cursor">&nbsp;</span>'));
+  }
+  ACT.newgame = () => { G = { drawn: [], rerolls: 3, driver: null, season: null, race: null, speed: 1, paused: false, build: { e: 1, b: 1, s: 1 } }; gridScreen(); };
+
+  // ---------------- DRIVER LIST / DRAW ----------------
+  function driverTable(highlight) {
+    let s = '<span class="dim">' + pad('#', 4) + pad('DRIVER', 22) + pad('TEAM', 17) + 'RATING</span>\n';
+    E.DRIVERS.slice().sort((a, b) => b.rating - a.rating).forEach((d, i) => {
+      const line = pad(i + 1, 4) + rtxt(pad(d.name, 22), d.rating) + pad(E.TEAM[d.team].name, 17) + rtxt(lpad(d.rating, 4), d.rating);
+      s += (d.name === highlight ? '<span class="me">' + line + ' &lt;</span>' : line) + '\n';
+    });
+    return s;
+  }
+  const legend = () => '<span class="dim">Ratings are driver-only (car ignored), scale 60-120:</span> ' + rtxt('60-89', 80) + ' ' + rtxt('90-109', 100) + ' ' + rtxt('110-120', 115);
+
+  function gridScreen() {
+    show(header('THE 2026 GRID') + block(legend() + '\n\n' + driverTable()) +
+      block('Your team: <span class="hl">MY BEST FORMULA</span> (new 12th team). The driver you draw leaves their team\nand joins you; a reserve driver takes the empty seat.\n\n' + btn('DRAW A DRIVER', 'draw')));
+  }
+  ACT.draw = () => {
+    const pool = E.DRIVERS.filter(d => G.drawn.indexOf(d.name) < 0);
+    const d = pool[Math.floor(Math.random() * pool.length)];
+    G.drawn.push(d.name); G.driver = d.name;
+    drawScreen();
+  };
+  ACT.reroll = () => { if (G.rerolls > 0) { G.rerolls--; ACT.draw(); } };
+  function drawScreen() {
+    const d = E.DRIVERS.find(x => x.name === G.driver);
+    let s = 'THE DRAW...\n\n  Your driver:  ' + rtxt(d.name.toUpperCase(), d.rating) + '   rating ' + rtxt(d.rating, d.rating) + '\n  Previously:   ' + esc(E.TEAM[d.team].name) + '\n\n';
+    s += 'Re-rolls left: <span class="hl">' + G.rerolls + '</span> / 3\n\n';
+    s += btn('ACCEPT DRIVER', 'accept') + '   ' + btn('RE-ROLL', 'reroll', undefined, { disabled: G.rerolls <= 0 });
+    if (G.drawn.length > 1) s += '\n\n<span class="dim">Already drawn: ' + G.drawn.slice(0, -1).map(esc).join(', ') + '</span>';
+    show(header('DRIVER DRAW') + block(s) + block(legend() + '\n\n' + driverTable(G.driver)));
+  }
+  ACT.accept = () => { G.season = E.newSeason(G.driver); buildScreen(); };
+
+  // ---------------- CAR BUILD ----------------
+  function aiTable(myCar, round) {
+    const rows = E.TEAMS.map(t => ({ name: t.name, ov: E.overall(E.aiCar(t.id, round)), car: E.aiCar(t.id, round) }));
+    rows.push({ name: 'MY BEST FORMULA', ov: E.overall(myCar), car: myCar, me: true });
+    rows.sort((a, b) => b.ov - a.ov);
+    let s = '<span class="dim">' + pad('', 3) + pad('TEAM', 18) + pad('POWER', 7) + pad('AERO', 7) + pad('MECH', 7) + 'OVERALL</span>\n';
+    rows.forEach((r, i) => {
+      const line = pad(i + 1, 3) + pad(r.name, 18) + pad(r.car.p.toFixed(1), 7) + pad(r.car.a.toFixed(1), 7) + pad(r.car.m.toFixed(1), 7) + r.ov.toFixed(1);
+      s += (r.me ? '<span class="me">' + line + '</span>' : line) + '\n';
+    });
+    return s;
+  }
+  function buildScreen() {
+    const b = G.build;
+    const cost = k => E.COMPONENTS[k].tiers[b[k] - 1];
+    const total = cost('e') + cost('b') + cost('s');
+    const left = E.START_BUDGET - total;
+    let s = 'Budget: ' + money(E.START_BUDGET) + '   Spent: ' + money(total) + '   Left: <span class="' + (left < 0 ? 'bad' : 'good') + '">' + money(left) + '</span>\n' +
+      '<span class="dim">Unspent money is kept for upgrades after the races. Every part can later be upgraded up to level ' + E.MAX_LEVEL + '.</span>\n\n';
+    ['e', 'b', 's'].forEach(k => {
+      const C = E.COMPONENTS[k];
+      s += '<span class="hl">' + C.name + '</span>  -> ' + C.stat + ' ' + E.levelStat(b[k]) + '\n<span class="dim">' + esc(C.desc) + '</span>\n';
+      C.tiers.forEach((c, i) => {
+        s += '  ' + btn('L' + (i + 1) + ' ' + money(c), 'tier', k + (i + 1), { on: b[k] === i + 1 }) + ' ';
+      });
+      s += '\n\n';
+    });
+    const car = { p: E.levelStat(b.e), a: E.levelStat(b.b), m: E.levelStat(b.s) };
+    s += 'Tyre wear multiplier (suspension): x' + (1.12 - 0.025 * b.s).toFixed(3) + '\n\n';
+    s += btn('CONFIRM BUILD', 'confirmBuild', undefined, { disabled: left < 0 });
+    show(header('CAR BUILD') + block('Driver: ' + rtxt(G.driver, G.season.entries.find(e => e.isPlayer).rating) + '\n\n' + s) +
+      block('<span class="hl">CAR PERFORMANCE vs 2026 FIELD</span> (stat 60-100)\n\n' + aiTable(car, 0)));
+  }
+  ACT.tier = arg => { G.build[arg[0]] = +arg.slice(1); buildScreen(); };
+  ACT.confirmBuild = () => {
+    const S = G.season, b = G.build;
+    const total = ['e', 'b', 's'].reduce((a, k) => a + E.COMPONENTS[k].tiers[b[k] - 1], 0);
+    if (total > E.START_BUDGET) return;
+    S.levels = { e: b.e, b: b.b, s: b.s }; S.money = E.START_BUDGET - total; S.built = true;
+    preRace();
+  };
+
+  // ---------------- PRE-RACE ----------------
+  function meterLine(label, v) { return pad(label, 14) + bar(v, 20) + ' ' + Math.round(v * 100) + '%'; }
+  function fcText(blocks, fromLap, n) {
+    return blocks.filter(b => b.to >= fromLap).slice(0, n).map(b => 'L' + b.from + '-' + b.to + ' ' + wxTag(b.fc)).join('  ');
+  }
+  function wxTag(v) { return v === 0 ? '<span class="r-orange">DRY</span>' : v === 1 ? '<span class="good">LIGHT RAIN</span>' : '<span class="bad">HEAVY RAIN</span>'; }
+
+  function preRace(keep) {
+    stopTimer();
+    const S = G.season;
+    if (!keep) G.race = E.prepareRace(S);
+    const race = G.race, T = race.track;
+    let s = '<span class="hl">ROUND ' + (S.round + 1) + '/6 - ' + T.name.toUpperCase() + '</span>\n' + esc(T.circuit) + '\n' +
+      'Race distance: ' + T.laps + ' laps (half of the real ' + T.realLaps + ').  Pit lane loss: ~' + T.pit.toFixed(1) + 's (~' + (T.pit * 0.5).toFixed(1) + 's under Safety Car)\n\n' +
+      meterLine('POWER', T.w.p) + '  <span class="dim">engine</span>\n' +
+      meterLine('AERO', T.w.a) + '  <span class="dim">bodywork</span>\n' +
+      meterLine('MECH GRIP', T.w.m) + '  <span class="dim">suspension</span>\n' +
+      meterLine('TYRE WEAR', T.abr / 1.4) + '\n' +
+      meterLine('OVERTAKING', T.ovt / 0.7) + '\n' +
+      meterLine('SAFETY CAR', T.sc / 0.6) + '\n';
+    s += '\n<span class="hl">WEATHER FORECAST</span> <span class="dim">(about 75% reliable)</span>\n';
+    const fc = race.blocks;
+    for (let i = 0; i < fc.length; i += 4) s += '  ' + fcText(fc.slice(i, i + 4), 0, 4) + '\n';
+    s += 'Current conditions: ' + E.trackState(race.wet) + '\n';
+    // qualifying
+    let q = '<span class="hl">QUALIFYING RESULT</span>' + (race.wet > 0.2 ? ' <span class="dim">(wet session)</span>' : '') + '\n<span class="dim">' + pad('POS', 5) + pad('DRIVER', 22) + pad('TEAM', 17) + 'TIME</span>\n';
+    const pole = race.grid[0].q;
+    race.grid.forEach((c, i) => {
+      const line = pad(i + 1, 5) + rtxt(pad(c.name, 22), c.rating) + pad(c.teamName, 17) + (i === 0 ? fmtLap(c.q) : '+' + (c.q - pole).toFixed(3));
+      q += (c.isPlayer ? '<span class="me">' + line + '</span>' : line) + '\n';
+    });
+    const me = race.cars.find(c => c.isPlayer);
+    let t = 'You start from <span class="hl">P' + me.grid + '</span>. Choose your starting tyre:\n\n';
+    ['S', 'M', 'H', 'I', 'W'].forEach(k => t += btn(E.TYRES[k].name, 'startTyre', k, { on: G.startTyre === k }) + ' ');
+    t += '\n\n<span class="dim">' +
+      'SOFT   fastest, wears quickly (~11 laps here x track wear)\n' +
+      'MEDIUM balanced (~18 laps)            HARD  slowest, most durable (~28 laps)\n' +
+      'INTER  for damp / wet track           WET   for heavy rain / standing water\n' +
+      'Dry race rule: you must use at least two different dry compounds (S/M/H)\n' +
+      'unless you use INTER or WET tyres. Breaking it = 30s time penalty.</span>\n\n';
+    t += btn('START RACE', 'startRace', undefined, { disabled: !G.startTyre });
+    show(header('PRE-RACE') + block(s) + block(t) + block(q));
+  }
+  ACT.startTyre = k => { G.startTyre = k; preRace2(); };
+  function preRace2() {
+    // re-render without regenerating the race
+    const sc = window.scrollY;
+    preRace(true);
+    window.scrollTo(0, sc);
+  }
+  ACT.startRace = () => {
+    if (!G.startTyre) return;
+    E.startRace(G.race, G.startTyre);
+    G.startTyre = null;
+    G.paused = false; G.elapsed = 0;
+    raceScreen();
+    startTimer();
+  };
+
+  // ---------------- RACE ----------------
+  function startTimer() {
+    stopTimer();
+    timer = setInterval(() => {
+      if (!G || !G.race || G.paused || G.race.finished) return;
+      G.elapsed += 100 * G.speed;
+      if (G.elapsed >= LAP_MS) {
+        G.elapsed = 0;
+        E.simLap(G.race);
+        raceScreen();
+        if (G.race.finished) stopTimer();
+      } else {
+        const el = document.getElementById('lapbar');
+        if (el) el.textContent = bar(G.elapsed / LAP_MS, 30);
+      }
+    }, 100);
+  }
+  function stopTimer() { if (timer) clearInterval(timer); timer = null; }
+
+  function raceScreen() {
+    const race = G.race, T = race.track;
+    const run = E.running(race);
+    const me = race.cars.find(c => c.isPlayer);
+    const nextLap = Math.min(race.laps, race.lap + 1);
+    let top = '<span class="hl">ROUND ' + (race.round + 1) + '/6 - ' + T.name.toUpperCase() + '</span>\n';
+    if (!race.finished) {
+      top += 'LAP <span class="hl">' + nextLap + '/' + race.laps + '</span>  <span id="lapbar">' + bar(G.elapsed / LAP_MS, 30) + '</span>   ' +
+        btn('1x', 'speed', 1, { on: G.speed === 1 }) + ' ' + btn('2x', 'speed', 2, { on: G.speed === 2 }) + '  ' +
+        btn(G.paused ? 'RESUME' : 'PAUSE', 'pause') + '\n';
+    } else top += '<span class="hl">CHEQUERED FLAG - RACE FINISHED</span>\n';
+    const r = race.rain[Math.max(1, race.lap)] || 0;
+    top += 'WEATHER: ' + wxTag(r) + '   TRACK: ' + E.trackState(race.wet) + ' (wetness ' + Math.round(race.wet * 100) + '%)' +
+      (race.sc > 0 ? '   <span class="r-lemon">*** SAFETY CAR ***</span>' : '') + '\n';
+    if (!race.finished) top += 'RADAR <span class="dim">(~75% reliable)</span>: ' + fcText(race.blocks, nextLap, 4) + '\n';
+
+    // timing
+    let t = '<span class="dim">' + pad('P', 4) + pad('DRIVER', 21) + pad('TEAM', 17) + pad('GAP', 10) + pad('INT', 8) + pad('TYRE', 7) + pad('PIT', 4) + 'LAST</span>\n';
+    const leader = run[0];
+    const avgLap = leader && race.lap > 0 ? leader.total / race.lap : 80;
+    const order = race.finished ? race.result : run.concat(race.cars.filter(c => c.status !== 'run'));
+    order.forEach((c, i) => {
+      let gap = '', int = '';
+      if (c.status !== 'run') { gap = 'DNF'; }
+      else if (race.lap === 0) { gap = 'GRID ' + c.grid; }
+      else if (i === 0) gap = 'LEADER';
+      else {
+        const g = c.total - order[0].total;
+        const down = Math.floor(g / avgLap);
+        gap = down >= 1 ? '+' + down + ' LAP' + (down > 1 ? 'S' : '') : '+' + g.toFixed(3);
+        int = '+' + (c.total - order[i - 1].total).toFixed(1);
+      }
+      const ty = c.status === 'run' ? E.TYRES[c.tyre].short + ' ' + lpad(c.age, 2) : '';
+      const line = pad((c.status === 'run' ? i + 1 : '-'), 4) + rtxt(pad(c.name, 21), c.rating) + pad(c.teamName, 17) + pad(gap, 10) + pad(int, 8) + pad(ty, 7) + pad(c.stops, 4) + (race.lap ? fmtLap(c.last) : '');
+      t += (c.isPlayer ? '<span class="me">' + line + '</span>' : line) + '\n';
+    });
+    if (race.fastest) t += '\n<span class="dim">Fastest lap: ' + esc(race.fastest.name) + ' ' + fmtLap(race.fastest.time) + ' (lap ' + race.fastest.lap + ')</span>\n';
+
+    // controls
+    let c = '';
+    if (race.finished) {
+      c += 'You finished: <span class="hl">' + (me.pos ? 'P' + me.pos : 'DNF') + '</span>' + (me.penalty ? ' <span class="bad">(incl. 30s penalty)</span>' : '') + '\n\n' + btn('CONTINUE TO RESULTS', 'results');
+    } else if (me.status !== 'run') {
+      c += '<span class="bad">You are out of the race (' + esc(me.dnfReason) + ').</span>\n\n' + btn('SKIP TO END OF RACE', 'skip');
+    } else {
+      const life = Math.max(0, 1 - me.wear);
+      const pos = run.indexOf(me) + 1;
+      c += '<span class="hl">YOUR CAR</span>  P' + pos + '   Tyre: ' + E.TYRES[me.tyre].name + ' (' + me.age + ' laps)  life ' + bar(life, 20) + ' ' + Math.round(life * 100) + '%' +
+        (me.wear > 1 ? ' <span class="bad">!! OFF THE CLIFF !!</span>' : '') + '\n';
+      c += 'Stops: ' + me.stops + '   Dry compounds used: ' + ([...me.usedDry].map(k => E.TYRES[k].short).join(',') || '-') +
+        (me.usedWet ? '  (wet tyres used - rule exempt)' : me.usedDry.size < 2 ? '  <span class="r-orange">(still need a 2nd dry compound)</span>' : '') + '\n';
+      const pr = E.projectPit(race);
+      if (pr) c += 'Pit now: ~' + pr.loss.toFixed(1) + 's lost -> rejoin around <span class="hl">P' + pr.pos + '</span>\n';
+      c += '\nPACE:  ';
+      Object.keys(E.MODES).forEach(k => c += btn(k, 'mode', k, { on: me.mode === k }) + ' ');
+      c += '\n<span class="dim">       PUSH: -0.3s/lap, +40% tyre wear, more risk   CONSERVE: +0.35s/lap, -30% tyre wear</span>\n';
+      c += '\nBOX:   ';
+      ['S', 'M', 'H', 'I', 'W'].forEach(k => c += btn(E.TYRES[k].name, 'box', k, { on: race.boxReq === k }) + ' ');
+      if (race.boxReq) c += ' ' + btn('CANCEL', 'box', '');
+      c += '\n' + (race.boxReq ? '<span class="r-lemon">BOX, BOX! Pitting at the end of lap ' + nextLap + ' for ' + E.TYRES[race.boxReq].name + '.</span>' : '<span class="dim">       Choose a compound to pit at the end of the current lap.</span>') + '\n';
+    }
+    // log
+    let l = '<span class="hl">RACE CONTROL</span>\n';
+    race.log.filter(x => x.msg).slice(-9).reverse().forEach(x => l += '<span class="dim">L' + lpad(x.lap, 2) + '</span>  ' + esc(x.msg) + '\n');
+
+    const sy = window.scrollY;
+    term.innerHTML = header('RACE') + block(top) + block(c) + block(t) + block(l);
+    window.scrollTo(0, sy);
+  }
+  ACT.speed = v => { G.speed = +v; raceScreen(); };
+  ACT.pause = () => { G.paused = !G.paused; raceScreen(); };
+  ACT.mode = k => { const me = G.race.cars.find(c => c.isPlayer); me.mode = k; raceScreen(); };
+  ACT.box = k => { G.race.boxReq = k || null; raceScreen(); };
+  ACT.skip = () => { while (!G.race.finished) E.simLap(G.race); stopTimer(); raceScreen(); };
+
+  // ---------------- RESULTS ----------------
+  ACT.results = () => {
+    const race = G.race, S = G.season;
+    const res = E.applyResults(S, race);
+    const me = race.cars.find(c => c.isPlayer);
+    let s = '<span class="hl">' + race.track.name.toUpperCase() + ' - RESULT</span>\n\n<span class="dim">' + pad('POS', 5) + pad('DRIVER', 22) + pad('TEAM', 17) + pad('GRID', 6) + pad('TIME/GAP', 14) + 'PTS</span>\n';
+    const win = race.result[0];
+    const avgLap = win.total / race.laps;
+    race.result.forEach((c, i) => {
+      let tm;
+      if (c.status !== 'run') tm = 'DNF';
+      else if (i === 0) { const m = Math.floor(win.total / 60); tm = Math.floor(m / 60) + ':' + String(m % 60).padStart(2, '0') + ':' + (win.total % 60).toFixed(3).padStart(6, '0'); }
+      else { const g = c.total - win.total; const d = Math.floor(g / avgLap); tm = d >= 1 ? '+' + d + ' lap' + (d > 1 ? 's' : '') : '+' + g.toFixed(3) + 's'; }
+      if (c.penalty) tm += '*';
+      const pts = c.pos && c.pos <= 10 ? E.POINTS[c.pos - 1] : 0;
+      const line = pad(c.pos || 'DNF', 5) + rtxt(pad(c.name, 22), c.rating) + pad(c.teamName, 17) + pad(c.grid, 6) + pad(tm, 14) + (pts || '');
+      s += (c.isPlayer ? '<span class="me">' + line + '</span>' : line) + '\n';
+    });
+    if (race.cars.some(c => c.penalty)) s += '<span class="dim">* includes 30s penalty (two-compound rule)</span>\n';
+    let m = 'Your result: <span class="hl">' + (me.pos ? 'P' + me.pos : 'DNF') + '</span>   Prize money: <span class="good">+' + money(res.money) + '</span>   Bank: ' + money(S.money) + '\n';
+    show(header('RACE RESULT') + block(m) + block(s) + block(standingsTable()) +
+      block(S.round >= 6 ? btn('SEE FINAL CHAMPIONSHIP', 'final') : btn('GO TO THE GARAGE', 'garage')));
+  };
+  function standingsTable(limit) {
+    const st = E.standings(G.season);
+    let s = '<span class="hl">DRIVERS\' CHAMPIONSHIP</span> <span class="dim">after round ' + G.season.round + '/6</span>\n<span class="dim">' + pad('POS', 5) + pad('DRIVER', 22) + pad('TEAM', 17) + 'PTS</span>\n';
+    st.slice(0, limit || st.length).forEach(r => {
+      const line = pad(r.pos, 5) + rtxt(pad(r.e.name, 22), r.e.rating) + pad(r.e.teamName, 17) + lpad(r.pts, 3);
+      s += (r.e.isPlayer ? '<span class="me">' + line + '</span>' : line) + '\n';
+    });
+    return s;
+  }
+
+  // ---------------- GARAGE ----------------
+  ACT.garage = () => garageScreen();
+  function garageScreen() {
+    const S = G.season;
+    const T = E.TRACKS[S.round];
+    let s = 'Bank: <span class="good">' + money(S.money) + '</span>\n\n';
+    ['e', 'b', 's'].forEach(k => {
+      const C = E.COMPONENTS[k], L = S.levels[k];
+      s += pad(C.name, 12) + 'L' + pad(L, 3) + bar(L / E.MAX_LEVEL, 10) + '  ' + C.stat + ' ' + E.levelStat(L) + '   ';
+      if (L >= E.MAX_LEVEL) s += '<span class="dim">MAX LEVEL</span>';
+      else { const cst = E.upgradeCost(k, L); s += btn('UPGRADE to L' + (L + 1) + ' ' + money(cst), 'upgrade', k, { disabled: cst > S.money }); }
+      s += '\n<span class="dim">' + pad('', 12) + esc(C.desc) + '</span>\n';
+    });
+    s += '\nTyre wear multiplier: x' + (1.12 - 0.025 * S.levels.s).toFixed(3) + '\n';
+    let n = '<span class="hl">NEXT: ROUND ' + (S.round + 1) + '/6 - ' + T.name.toUpperCase() + '</span>\n' +
+      meterLine('POWER', T.w.p) + '\n' + meterLine('AERO', T.w.a) + '\n' + meterLine('MECH GRIP', T.w.m) + '\n';
+    let h = '<span class="hl">YOUR SEASON SO FAR</span>\n';
+    S.history.forEach((x, i) => h += pad('R' + (i + 1) + ' ' + x.track, 18) + pad('grid P' + x.grid, 10) + pad('finish ' + (x.pos ? 'P' + x.pos : 'DNF'), 13) + pad('+' + x.pts + ' pts', 9) + '+' + money(x.money) + '\n');
+    const car = E.playerCar(S);
+    show(header('GARAGE') + block(s) + block(n) + block(btn('GO TO ROUND ' + (S.round + 1), 'next')) +
+      block('<span class="hl">CAR PERFORMANCE vs FIELD</span> <span class="dim">(rivals keep developing too)</span>\n\n' + aiTable(car, S.round)) + block(h) + block(standingsTable(10)));
+  }
+  ACT.upgrade = k => {
+    const S = G.season, L = S.levels[k];
+    if (L >= E.MAX_LEVEL) return;
+    const c = E.upgradeCost(k, L);
+    if (c > S.money) return;
+    S.money -= c; S.levels[k]++;
+    const y = window.scrollY; garageScreen(); window.scrollTo(0, y);
+  };
+  ACT.next = () => { G.startTyre = null; preRace(); };
+
+  // ---------------- FINAL ----------------
+  ACT.final = () => {
+    const st = E.standings(G.season);
+    const mine = st.find(r => r.e.isPlayer);
+    const p = mine.pos;
+    let s = '';
+    if (p === 1) {
+      s += '<span class="r-lemon">' + esc([
+        '   ___________',
+        '  \'._==_==_=_.\'',
+        '  .-\\:      /-.',
+        ' | (|:.     |) |',
+        '  \'-|:.     |-\'',
+        '    \\::.    /',
+        '     \'::. .\'',
+        '       ) (',
+        '     _.\' \'._',
+        '    \'-------\'',
+      ].join('\n')) + '</span>\n\n';
+      s += '<span class="r-lemon">WORLD CHAMPION!!!</span>\n\nIncredible. A brand-new team, a car built from ' + money(E.START_BUDGET) + ', and you beat the\nwhole 2026 grid. ' + esc(G.driver) + ' is the Formula 1 World Champion!\n';
+    } else if (p <= 3) {
+      s += '<span class="r-lemon">' + esc([
+        '        ___',
+        '   ___ | ' + p + ' | ___',
+        '  | 2 ||   || 3 |',
+        ' _|___||___||___|_',
+      ].join('\n')) + '</span>\n\n';
+      s += '<span class="r-lemon">CONGRATULATIONS! P' + p + ' IN THE WORLD CHAMPIONSHIP!</span>\n\nA podium in the Drivers\' Championship with a rookie team. The paddock is\ntalking about My Best Formula. Champagne for everyone!\n';
+    } else {
+      s += 'You finished <span class="hl">P' + p + '</span> in the Drivers\' Championship with ' + mine.pts + ' points.\n\n' +
+        (p <= 6 ? 'So close! A strong season for a new team - the podium is within reach.' :
+          p <= 12 ? 'A respectable debut season. Smarter strategy and upgrades could take you further.' :
+            'A tough first year. Learn the tyres, read the weather and try again!') + '\n';
+    }
+    let h = '\n<span class="hl">YOUR SEASON</span>\n';
+    G.season.history.forEach((x, i) => h += pad('R' + (i + 1) + ' ' + x.track, 18) + pad('grid P' + x.grid, 10) + pad('finish ' + (x.pos ? 'P' + x.pos : 'DNF'), 13) + '+' + x.pts + ' pts\n');
+    show(header('SEASON COMPLETE') + block(s + h) + block(standingsTable()) + block(btn('START NEW GAME', 'newgame')));
+  };
+
+  titleScreen();
+})();
+</script>
+</body>
+</html>
