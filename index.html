@@ -94,7 +94,9 @@ const Engine = (function () {
     { name: 'Franco Colapinto',   team: 'alp', rating: 84 },
     { name: 'Lance Stroll',       team: 'ast', rating: 79 },
   ];
-  const RESERVE_RATING = 76;
+  // The drafted driver's empty seat goes to F2 driver Rafael Camara (2025 F3 champion)
+  const RESERVE_NAME = 'Rafael Camara';
+  const RESERVE_RATING = 86;
   const TOP_TEAMS = ['Mercedes', 'Ferrari', 'McLaren', 'Red Bull'];
   const PLAYER_TEAM = 'My Best Formula';
 
@@ -152,7 +154,7 @@ const Engine = (function () {
     const entries = [];
     DRIVERS.forEach(d => {
       if (d.name === driverName) {
-        entries.push({ id: 'R-' + d.team, name: 'Reserve Driver', rating: RESERVE_RATING, team: d.team, teamName: TEAM[d.team].name, isPlayer: false });
+        entries.push({ id: 'R-' + d.team, name: RESERVE_NAME, rating: RESERVE_RATING, team: d.team, teamName: TEAM[d.team].name, isPlayer: false });
       } else {
         entries.push({ id: d.name, name: d.name, rating: d.rating, team: d.team, teamName: TEAM[d.team].name, isPlayer: false });
       }
@@ -598,7 +600,7 @@ if (typeof document !== 'undefined') (function () {
 
   function gridScreen() {
     show(header('THE 2026 GRID') + block(legend() + '\n\n' + driverTable()) +
-      block('Your team: <span class="hl">MY BEST FORMULA</span> (new 12th team). The driver you draw leaves their team\nand joins you; a reserve driver takes the empty seat.\n\n' + btn('DRAW A DRIVER', 'draw')));
+      block('Your team: <span class="hl">MY BEST FORMULA</span> (new 12th team). The driver you draw leaves their team\nand joins you; F2 driver Rafael Camara takes the empty seat.\n\n' + btn('DRAW A DRIVER', 'draw')));
   }
   ACT.draw = () => {
     const pool = E.DRIVERS.filter(d => G.drawn.indexOf(d.name) < 0);
